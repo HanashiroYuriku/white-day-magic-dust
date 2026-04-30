@@ -27,5 +27,5 @@ To run this project locally:
 
 1. Clone this repository:
    ```bash
-   git clone [https://github.com/HanashiroYuriku/white-day-magic-dust.git](https://github.com/HanashiroYuriku/white-day-magic-dust.git)
+   git clone https://github.com/HanashiroYuriku/white-day-magic-dust.git
    ```
