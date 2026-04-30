@@ -11,7 +11,7 @@
             position: absolute; bottom: 10%; width: 100%; text-align: center; 
             color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             font-size: clamp(14px, 4vw, 18px); letter-spacing: 2px; pointer-events: none; 
-            transition: opacity 0.5s; animation: pulse 2s infinite; text-shadow: 0 0 10px rgba(255,255,255,0.8);
+            animation: pulse 2s infinite; text-shadow: 0 0 10px rgba(255,255,255,0.8);
         }
         @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
     </style>
@@ -26,11 +26,16 @@
         const instruction = document.getElementById('instruction');
         
         let width, height;
-        let particles = [];
-        const numParticles = 2200; 
+        
+        const numParticlesTotal = 5500; 
+        const numParticlesCrab = 3000;
+        const numParticlesName = 2500;
+        
+        let crabParticles = [];
+        let nameParticles = [];
+        
         let isTransitioning = false;
         
-        // audio setup
         const bgm = new Audio('darling.mp3'); 
         bgm.loop = true; 
         bgm.preload = 'auto';
@@ -38,12 +43,11 @@
         
         const sequence = [
             { text: 'Happy\nWhite Day', color: '#ff80b3' }, 
-            { text: 'かにちゃん', color: '#ffd700' },        
-            { text: '🦀', color: '#ff9900' }              
+            { text: 'かにちゃん', color: '#ffd700', isHer: true }, 
+            { text: '🦀', color: '#ff9900', isCrab: true }              
         ];
         let currentIndex = -1;
 
-        // coloring helper
         function hexToRgb(hex) {
             let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
             return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r: 255, g: 255, b: 255};
@@ -67,7 +71,6 @@
                 this.angle = Math.random() * Math.PI * 2; 
                 this.speed = Math.random() * 0.5 + 0.2; 
 
-                // color trans
                 this.color = {r: 255, g: 255, b: 255}; 
                 this.targetColor = {r: 255, g: 255, b: 255};
             }
@@ -80,8 +83,8 @@
                 if (this.isText) {
                     let dx = this.destX - this.x;
                     let dy = this.destY - this.y;
-                    this.vx += dx * 0.015;
-                    this.vy += dy * 0.015;
+                    this.vx += dx * 0.02;
+                    this.vy += dy * 0.02;
                     this.vx *= this.friction;
                     this.vy *= this.friction;
                     this.x += this.vx;
@@ -97,7 +100,6 @@
                     if (this.y > height) this.y = 0;
                 }
 
-                // color lerping
                 this.color.r += (this.targetColor.r - this.color.r) * 0.05;
                 this.color.g += (this.targetColor.g - this.color.g) * 0.05;
                 this.color.b += (this.targetColor.b - this.color.b) * 0.05;
@@ -111,28 +113,112 @@
             }
         }
 
-        for(let i=0; i<numParticles; i++) {
-            particles.push(new Particle());
+        for(let i=0; i<numParticlesCrab; i++) {
+            crabParticles.push(new Particle());
+        }
+        for(let i=0; i<numParticlesName; i++) {
+            nameParticles.push(new Particle());
+        }
+        
+        function getTargetsForOneFormation(offCtx, offCanvas, text, font, fillStyle, gap, x, y, maxTargetsCount) {
+            offCtx.clearRect(0, 0, width, height);
+            offCtx.fillStyle = fillStyle;
+            offCtx.textAlign = 'center';
+            offCtx.textBaseline = 'middle';
+            offCtx.font = font;
+            
+            offCtx.fillText(text, x, y);
+            
+            const imgData = offCtx.getImageData(0, 0, width, height).data;
+            let targets = [];
+            for (let yPos = 0; yPos < height; yPos += gap) {
+                for (let xPos = 0; xPos < width; xPos += gap) {
+                    if (imgData[(yPos * width + xPos) * 4 + 3] > 128) {
+                        targets.push({ x: xPos + (Math.random() - 0.5) * 4, y: yPos + (Math.random() - 0.5) * 4 });
+                    }
+                }
+            }
+            
+            if (targets.length > maxTargetsCount) {
+                targets.sort(() => Math.random() - 0.5);
+                targets = targets.slice(0, maxTargetsCount);
+            }
+            targets.sort(() => Math.random() - 0.5);
+            return targets;
         }
 
-        function getTargetPositions(textItem) {
+        function getForTargets() {
             const offCanvas = document.createElement('canvas');
             const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
-            offCanvas.width = width;
-            offCanvas.height = height;
+            offCanvas.width = width; offCanvas.height = height;
+            let isMobile = width < 600;
+            let gap = isMobile ? 3 : 4; 
+            
+            // Perbaikan ukuran & posisi kata "for" agar tidak bertabrakan
+            let fontSizeFor = isMobile ? width / 10 : width / 25;
+            let forY = height / 2 - (isMobile ? width / 4 : width / 12);
+            
+            return getTargetsForOneFormation(offCtx, offCanvas, "for", `italic ${fontSizeFor}px "Segoe UI", sans-serif`, 'white', gap, width / 2, forY, numParticlesName);
+        }
 
+        function getHerTargets(currentHerFont) {
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+            offCanvas.width = width; offCanvas.height = height;
+            let isMobile = width < 600;
+            
+            // PERBAIKAN 1: Gap dikecilkan menjadi 2 di mobile agar partikel lebih rapat (Sangat HD)
+            let gap = isMobile ? 2 : 3; 
+            
+            // PERBAIKAN 2: Ukuran Font disesuaikan agar proporsional dan tidak terpotong
+            let fontSizeHer = isMobile ? width / 5.5 : width / 9;
+            let herY = height / 2 + (isMobile ? width / 15 : width / 20);
+            
+            // PERBAIKAN 3: Fallback ke font Jepang bawaan sistem agar Hiragana sempurna
+            let fontString = `bold ${fontSizeHer}px ${currentHerFont}, "Meiryo", "Hiragino Kaku Gothic ProN", "MS PGothic", sans-serif`;
+            
+            return getTargetsForOneFormation(offCtx, offCanvas, "かにちゃん", fontString, 'white', gap, width / 2, herY, numParticlesCrab);
+        }
+
+        function getCrabTargetPositions() {
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+            offCanvas.width = width; offCanvas.height = height;
+            let isMobile = width < 600;
+            let gap = isMobile ? 4 : 5; 
+            let crabSize = isMobile ? width / 2.5 : width / 6;
+            let crabY = height / 2 - crabSize / 6;
+            return getTargetsForOneFormation(offCtx, offCanvas, "🦀", `${crabSize}px sans-serif`, 'white', gap, width / 2, crabY, numParticlesCrab);
+        }
+
+        function getNameTargetPositions() {
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+            offCanvas.width = width; offCanvas.height = height;
+            let isMobile = width < 600;
+            let gap = isMobile ? 3 : 3; 
+            let crabSize = isMobile ? width / 2.5 : width / 6;
+            let nameSize = isMobile ? width / 8.5 : width / 26;
+            let nameY = height / 2 + crabSize / 2;
+            return getTargetsForOneFormation(offCtx, offCanvas, "", `bold ${nameSize}px "Segoe UI", Tahoma, sans-serif`, 'white', gap, width / 2, nameY, numParticlesName);
+        }
+
+        function getSharedTextTargets(text) {
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+            offCanvas.width = width; offCanvas.height = height;
+            let isMobile = width < 600;
+            let gap = isMobile ? 3 : 4; 
+            let fontSize = isMobile ? width / 6 : width / 12; 
+            if (fontSize > 100) fontSize = 100;
+
+            offCtx.clearRect(0, 0, width, height);
             offCtx.fillStyle = 'white';
             offCtx.textAlign = 'center';
             offCtx.textBaseline = 'middle';
-            
-            let isMobile = width < 600;
-            let fontSize = isMobile ? width / 4.5 : width / 10; 
-            if (fontSize > 100) fontSize = 100;
-            if (textItem.text === '🦀') fontSize = isMobile ? width / 2.5 : width / 5;
-
             offCtx.font = `bold ${fontSize}px sans-serif`;
-            
-            let lines = textItem.text.split('\n');
+
+            let lines = text.split('\n');
             let lineHeight = fontSize * 1.2;
             let startY = (height / 2) - ((lines.length - 1) * lineHeight / 2);
 
@@ -141,24 +227,60 @@
             });
 
             const imgData = offCtx.getImageData(0, 0, width, height).data;
-            let gap = isMobile ? 4 : 5; 
-            if (textItem.text === '🦀') gap = isMobile ? 5 : 7;
-            
             let targets = [];
             for (let y = 0; y < height; y += gap) {
                 for (let x = 0; x < width; x += gap) {
-                    const alpha = imgData[(y * width + x) * 4 + 3];
-                    if (alpha > 128) {
+                    if (imgData[(y * width + x) * 4 + 3] > 128) {
                         targets.push({ x: x + (Math.random() - 0.5) * 4, y: y + (Math.random() - 0.5) * 4 });
                     }
                 }
             }
-
-            if (targets.length > numParticles - 300) {
+            
+            if (targets.length > numParticlesTotal - 100) {
                 targets.sort(() => Math.random() - 0.5);
-                targets = targets.slice(0, numParticles - 300);
+                targets = targets.slice(0, numParticlesTotal - 100);
             }
+            targets.sort(() => Math.random() - 0.5);
             return targets;
+        }
+
+        function assignParticlesToCrabPool(targets) {
+            crabParticles.forEach((p, i) => {
+                if (i < targets.length) { p.destX = targets[i].x; p.destY = targets[i].y; p.isText = true; } 
+                else { p.isText = false; }
+            });
+        }
+
+        function assignParticlesToNamePool(targets) {
+            nameParticles.forEach((p, i) => {
+                if (i < targets.length) { p.destX = targets[i].x; p.destY = targets[i].y; p.isText = true; } 
+                else { p.isText = false; }
+            });
+        }
+
+        function assignTotalParticlesToSharedText(targets) {
+            let totalAvailable = numParticlesTotal;
+            let poolsToProcess = [crabParticles, nameParticles];
+
+            for (let targetIdx = 0; targetIdx < targets.length; targetIdx++) {
+                if (targetIdx < totalAvailable) {
+                    let poolIdx = targetIdx < numParticlesCrab ? 0 : 1;
+                    let pIdx = targetIdx < numParticlesCrab ? targetIdx : targetIdx - numParticlesCrab;
+                    let particle = poolsToProcess[poolIdx][pIdx];
+                    particle.destX = targets[targetIdx].x;
+                    particle.destY = targets[targetIdx].y;
+                    particle.isText = true;
+                }
+            }
+            
+            for (let poolIdx = 0; poolIdx < poolsToProcess.length; poolIdx++) {
+                let pool = poolsToProcess[poolIdx];
+                let startIndex = poolIdx === 0 ? targets.length : targets.length - numParticlesCrab;
+                if (startIndex < 0) startIndex = 0;
+                for (let particleIdx = startIndex; particleIdx < pool.length; particleIdx++) {
+                    pool[particleIdx].isText = false;
+                }
+            }
         }
 
         function resize() {
@@ -167,17 +289,15 @@
             
             if(currentIndex >= 0 && !isTransitioning) {
                const seq = sequence[currentIndex];
-               const targets = getTargetPositions(seq);
-               targets.sort(() => Math.random() - 0.5);
-               particles.forEach((p, i) => {
-                   if (i < targets.length) {
-                       p.destX = targets[i].x;
-                       p.destY = targets[i].y;
-                       p.isText = true;
-                   } else {
-                       p.isText = false; 
-                   }
-               });
+               if (seq.isCrab) {
+                   assignParticlesToCrabPool(getCrabTargetPositions());
+                   assignParticlesToNamePool(getNameTargetPositions());
+               } else if (seq.isHer) {
+                   assignParticlesToCrabPool(getHerTargets(herFonts[currentFontIndex]));
+                   assignParticlesToNamePool(getForTargets());
+               } else {
+                   assignTotalParticlesToSharedText(getSharedTextTargets(seq.text));
+               }
             }
         }
         window.addEventListener('resize', resize);
@@ -186,57 +306,57 @@
         function triggerNextAnimation() {
             if (isTransitioning) return;
             
-            instruction.style.opacity = '0';
+            instruction.style.display = 'none';
             currentIndex++;
             
             if (currentIndex >= sequence.length) {
                 currentIndex = -1;
                 isTransitioning = true;
-                
                 targetGlow = hexToRgb('#ffffff'); 
 
-                particles.forEach(p => {
+                [crabParticles, nameParticles].forEach(pool => pool.forEach(p => {
                     p.isText = true; 
                     p.destX = Math.random() * width;
                     p.destY = Math.random() * height;
                     p.setTargetColor('#ffffff'); 
-                });
+                }));
+                
                 setTimeout(() => {
-                    particles.forEach(p => p.isText = false);
+                    [crabParticles, nameParticles].forEach(pool => pool.forEach(p => p.isText = false));
                     isTransitioning = false; 
                 }, 200);
 
             } else {
                 isTransitioning = true;
                 const seq = sequence[currentIndex];
-                
                 targetGlow = hexToRgb(seq.color);
 
-                particles.forEach(p => {
+                [crabParticles, nameParticles].forEach(pool => pool.forEach(p => {
                     p.isText = true; 
                     p.destX = Math.random() * width;
                     p.destY = Math.random() * height;
                     p.setTargetColor(seq.color); 
-                });
+                }));
 
                 setTimeout(() => {
-                    const targets = getTargetPositions(seq);
-                    targets.sort(() => Math.random() - 0.5);
-
-                    particles.forEach((p, i) => {
-                        if (i < targets.length) {
-                            p.destX = targets[i].x;
-                            p.destY = targets[i].y;
-                            p.isText = true; 
-                        } else {
-                            p.isText = false; 
-                        }
-                    });
-                    
+                    if (seq.isCrab) {
+                        assignParticlesToCrabPool(getCrabTargetPositions());
+                        assignParticlesToNamePool(getNameTargetPositions());
+                    } else if (seq.isHer) {
+                        assignParticlesToCrabPool(getHerTargets(herFonts[currentFontIndex]));
+                        assignParticlesToNamePool(getForTargets());
+                    } else {
+                        assignTotalParticlesToSharedText(getSharedTextTargets(seq.text));
+                    }
                     isTransitioning = false; 
                 }, 800);
             }
         }
+
+        // PERBAIKAN 4: Menggunakan font yang ramah karakter Hiragana/Jepang
+        const herFonts = ['"Meiryo", sans-serif', '"Hiragino Maru Gothic ProN", sans-serif', '"Yu Gothic", sans-serif', '"MS PGothic", sans-serif'];
+        let fontCycleTimer = 0;
+        let currentFontIndex = 0;
 
         function animate() {
             ctx.fillStyle = 'rgba(5, 7, 20, 0.3)'; 
@@ -249,39 +369,37 @@
             ctx.shadowBlur = window.innerWidth < 600 ? 5 : 10; 
             ctx.shadowColor = `rgb(${currentGlow.r | 0}, ${currentGlow.g | 0}, ${currentGlow.b | 0})`;
 
-            particles.forEach(p => {
-                p.update();
-                p.draw();
-            });
+            if (currentIndex >= 0 && sequence[currentIndex].isHer && !isTransitioning) {
+                fontCycleTimer++;
+                if (fontCycleTimer > 120) { 
+                    fontCycleTimer = 0;
+                    currentFontIndex = (currentFontIndex + 1) % herFonts.length;
+                    
+                    assignParticlesToCrabPool(getHerTargets(herFonts[currentFontIndex]));
+                }
+            }
+
+            crabParticles.forEach(p => { p.update(); p.draw(); });
+            nameParticles.forEach(p => { p.update(); p.draw(); });
             
             ctx.shadowBlur = 0;
             requestAnimationFrame(animate);
         }
 
-        let lastInteraction = 0;
-
         function handleUserInteraction() {
-            // 1. Eksekusi lagu
             if (!isMusicPlaying) {
                 let playPromise = bgm.play();
                 if (playPromise !== undefined) {
                     playPromise.then(() => {
                         isMusicPlaying = true;
-                    }).catch(err => {
-                        console.log("Menunggu izin browser...", err);
-                    });
+                    }).catch(err => console.log(err));
                 }
             }
-            
-            // 2. Majukan animasi
             triggerNextAnimation();
         }
 
-        // CUKUP PAKAI SATU INI SAJA. Paling aman, paling ampuh!
         window.addEventListener('click', handleUserInteraction);
-
         animate();
     </script>
-    <!-- cr: © 2026 Hanashiro Yuriku -->
 </body>
 </html>
