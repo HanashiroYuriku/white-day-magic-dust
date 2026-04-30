@@ -1,4 +1,4 @@
-# ✨ Kani's Magic Dust (White Day Surprise)
+# ✨ White Day Magic Dust (White Day Surprise)
 
 A magical, interactive particle animation built with HTML5 Canvas and Vanilla JavaScript. Designed specifically as a creative and lightweight web experience for a White Day surprise.
 
@@ -27,4 +27,5 @@ To run this project locally:
 
 1. Clone this repository:
    ```bash
-   git clone [-](-)
+   git clone [https://github.com/HanashiroYuriku/white-day-magic-dust.git](https://github.com/HanashiroYuriku/white-day-magic-dust.git)
+   ```
